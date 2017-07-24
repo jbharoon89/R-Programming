@@ -1,0 +1,208 @@
+---
+title: "EDA P1"
+output: html_notebook
+---
+
+**Exploratory Data Analysis:**
+
+```{r comics}
+comics <-read.csv("comics.csv")
+
+# Check levels of align
+levels(comics$align)
+
+# Check the levels of gender
+levels(comics$gender)
+
+# Create a 2-way contingency table
+table(comics$align, comics$gender)
+
+# Load dplyr
+library(dplyr)
+
+# Remove align level
+comics <- comics %>%
+  filter(align != "Reformed Criminals") %>%
+  droplevels()
+```
+
+```{r comic_a}
+# Load ggplot2
+library(ggplot2)
+
+# Create side-by-side barchart of gender by alignment
+ggplot(comics, aes(x = align, fill = gender)) + 
+  geom_bar(position = "dodge")
+
+# Create side-by-side barchart of alignment by gender
+ggplot(comics, aes(x = gender, fill = align)) + 
+  geom_bar(position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+**Conditional Proportions:**
+
+```{r comics_b}
+tab <- table(comics$align, comics$gender)
+options(scipen = 999, digits = 3) # Print fewer digits
+prop.table(tab)     # Joint proportions
+prop.table(tab, 2)  # Conditional on columns
+
+# Plot of gender by align
+ggplot(comics, aes(x = align, fill = gender)) +
+  geom_bar()
+  
+# Plot proportion of gender, conditional on align
+ggplot(comics, aes(x = align, fill = gender)) + 
+  geom_bar(position = "fill")
+```
+
+**Distribution of One Variable:**
+
+```{r comics_c}
+# Change the order of the levels in align
+comics$align <- factor(comics$align, 
+                       levels = c("Bad", "Neutral", "Good"))
+
+# Create plot of align
+ggplot(comics, aes(x = align)) + 
+  geom_bar()
+
+# Plot of alignment broken down by gender
+ggplot(comics, aes(x = align)) + 
+  geom_bar() +
+  facet_wrap(~ gender)
+
+# Create barchart of flavor
+ggplot(comics, aes(x = align)) + 
+  geom_bar(fill = "chartreuse") + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+**Numerical Summaries:**
+
+```{r cars}
+cars <- read.csv("cars04.csv")
+
+# Load package
+library(ggplot2)
+
+# Learn data structure
+str(cars)
+
+# Create faceted histogram
+ggplot(cars, aes(x = city_mpg)) +
+  geom_histogram() +
+  facet_wrap(~ suv)
+
+# No of Cylinders
+carsunique(cars$ncyl)
+
+# Filter cars with 4, 6, 8 cylinders
+common_cyl <- filter(cars, cars$ncyl %in% c(4, 6, 8))
+
+library(dplyr)
+
+# Create hist of horsepwr
+cars %>%
+  ggplot(aes(x = horsepwr)) +
+  geom_histogram() +
+  ggtitle("All Cars")
+
+# Create hist of horsepwr for affordable cars
+cars %>% 
+  filter(msrp < 25000) %>%
+  ggplot(aes(x = horsepwr)) +
+  geom_histogram() +
+  xlim(c(90, 550)) +
+  ggtitle(" Affordable Cars")
+```
+
+**Three binwidths:**
+The binwidth determines how smooth your distribution will appear: the smaller the binwidth, the more jagged your distribution becomes. It's good practice to consider several binwidths in order to detect different types of structure in your data.
+
+```{r cars_a}
+
+# Create hist of horsepwr with binwidth of 3
+cars %>%
+  ggplot(aes(horsepwr)) +
+  geom_histogram(binwidth = 3) +
+  ggtitle("Binwidth of 3")
+
+# Create hist of horsepwr with binwidth of 30
+cars %>%
+  ggplot(aes(horsepwr)) +
+  geom_histogram(binwidth = 30) +
+  ggtitle("Binwidth of 30")
+
+# Create hist of horsepwr with binwidth of 60
+cars %>%
+  ggplot(aes(horsepwr)) +
+  geom_histogram(binwidth = 60) +
+  ggtitle("Binwidth of 60")
+
+```
+
+**Boxplots:**
+
+In addition to indicating the center and spread of a distribution, a box plot provides a graphical means to detect outliers. We can apply this method to the msrp column (manufacturer's suggested retail price) to detect if there are unusually expensive or cheap cars.
+
+```{r cars_b}
+# Construct box plot of msrp
+cars %>%
+  ggplot(aes(x = 1, y = msrp)) +
+  geom_boxplot()
+
+# Exclude outliers from data
+cars_no_out <- cars %>%
+  filter(msrp < 100000)
+
+# Construct box plot of msrp using the reduced dataset
+cars_no_out %>%
+  ggplot(aes(x = 1, y = msrp)) +
+  geom_boxplot()
+```
+
+**Plot Selection:**
+
+Consider two other columns in the cars dataset: city_mpg and width. Which is the most appropriate plot for displaying the important features of their distributions? Remember, both density plots and box plots display the central tendency and spread of the data, but the box plot is more robust to outliers.
+
+```{r cars_c}
+# Create plot of city_mpg
+cars %>%
+  ggplot(aes(x = 1, y = city_mpg)) +
+  geom_boxplot()
+
+# Create plot of width
+cars %>% 
+  ggplot(aes(x = width)) +
+  geom_density()
+
+#Because the city_mpg variable has a much wider range with its outliers, it's best to #display its distribution as a box plot.
+```
+
+**MultiVariables:**
+
+```{r cars_d}
+# Facet hists using hwy mileage and ncyl
+cars %>%
+  ggplot(aes(x = hwy_mpg)) +
+  geom_histogram() +
+  facet_grid(ncyl ~ suv, labeller = label_both) +
+  ggtitle("Mileage and Cycle")
+```
+
+```{r custom_unwanted}
+# Filter for Asia, add column indicating outliers
+gap_asia <- gap2007 %>%
+  filter(continent == "Asia") %>%
+  mutate(is_outlier = lifeExp < 50)
+
+# Remove outliers, create box plot of lifeExp
+gap_asia %>% 
+  filter(!is_outlier) %>%
+  ggplot(aes(x = 1, y = lifeExp)) +
+  geom_boxplot()
+```
+
