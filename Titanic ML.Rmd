@@ -1,0 +1,315 @@
+---
+title: "Titanic ML - Kaggle Tutorial"
+author: "Javeed Basha"
+date: "July 29, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Initialization
+
+Let's begin with our analysis of Titanic Dataset using ML.
+
+```{r titanic}
+titanic_train <- read.csv("train.csv", stringsAsFactors = FALSE)
+
+titanic_test <- read.csv("test.csv", stringsAsFactors = FALSE)
+
+# Analyzing the Structure of the Data Frame
+str(titanic_train)
+
+str(titanic_test)
+```
+
+From, the Datasets, we can now understand that a total of 891 observations of 12 variables
+are present in the Train Dataset and a total of 418 Observations of 11 variables
+are present in Test Dataset.
+
+Each and every Data Scientist has his own way of interpreting the data and please do note
+that one can improve the accuracy and the efficiency of the data by utilising many variables
+in a way or other. Here, In order to keep it simple, I have utilised minimal variables.
+
+## Numbers Game
+
+```{r numbers_and_proportions}
+# Survival rates in absolute numbers
+print("Survival Rates(ABS):")
+table(titanic_train$Survived)
+
+# Survival rates in proportions
+print("Survival Rates(%):")
+prop.table(table(titanic_train$Survived))
+  
+# Two-way comparison: Sex and Survived
+print("Survival Rates Male & Female(ABS):")
+table(titanic_train$Sex, titanic_train$Survived)
+
+# Two-way comparison: row-wise proportions
+print("Survival Rates Male & Female(%):")
+prop.table(table(titanic_train$Sex, titanic_train$Survived), 1)
+
+```
+
+## Plots for the Survival Rate
+
+```{r plots, echo = FALSE}
+survival_rate <- prop.table(table(titanic_train$Sex, titanic_train$Survived), 1)
+
+plot(survival_rate)
+```
+
+As, can be noted from the above plots, the survival rates of female are higher than male.
+
+## Age!!!
+
+```{r age}
+# Creating a new column child
+# Initialising a new column
+titanic_train$Child <- NA
+titanic_train$Child[titanic_train$Age < 18] <- 1
+titanic_train$Child[titanic_train$Age >= 18] <- 0
+
+# Two-way comparison
+prop.table(table(titanic_train$Child, titanic_train$Survived), 1)
+
+```
+
+## First Analysis
+
+We use the test set for validating our predictions. We can notice that, contrary to the training set, the test set has no Survived column. We can add such a column using our predicted values. Next, when uploading our results, Kaggle will use this column (= our predictions) to score your performance. 
+
+```{r first_analysis}
+# Copy of test
+test <- titanic_test
+
+# Initialize a Survived column to 0
+test$Survived <- 0
+
+# Set Survived to 1 if Sex equals "female"
+test$Survived[titanic_test$Sex == "female"] <- 1
+
+# Initial Solution
+my_solution <- data.frame(PassengerID = test$PassengerId, Survived = test$Survived)
+
+# Write the solution to file
+write.csv(my_solution, file = 'my_solution.csv', row.names = F)
+
+```
+
+Please do note, that this solution takes into consideration that almost all females survived in the test dataset and also has lesser accuracy.
+
+We now implement ML techniques to improve our accuracy and score.
+
+## ML Techniques
+
+```{r decision_tree}
+library(rpart)
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+# Build the decision tree
+decision_tree <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, data = titanic_train, method = "class")
+
+# Visualize the decision tree using plot() and text()
+plot(decision_tree)
+text(decision_tree)
+
+# Fancy tree
+fancyRpartPlot(decision_tree)
+```
+
+Based on the Fancy Plot, we can understand that Sex, Age, Pclass, Fare and SibSp plays an important role.
+
+## Decision Tree Predictions
+
+```{r decision_tree_predictions}
+# Making predictions on the test set
+my_pred <- predict(decision_tree, newdata = titanic_test, type = "class")
+
+# Finishing the data.frame() call
+my_solution1 <- data.frame(PassengerId = titanic_test$PassengerId, Survived = my_pred)
+
+# Using nrow() on my_solution to check number of rows
+nrow(my_solution1)
+
+# Finish the write.csv() call
+write.csv(my_solution1, file = "my_solution1.csv", row.names = FALSE)
+
+```
+
+Your submission scored 0.78469, which is an improvement of your previous score of 0.76555. Great job!
+
+## Improving Decision Tree
+
+Adding **cp** determines when the splitting up of the decision tree stops.
+
+Adding **minsplit** determines the minimum amount of observations in a leaf of the tree.
+
+```{r decision_tree_improvements}
+
+dt_improved <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, 
+                     data = titanic_train, method = "class", 
+                     control = rpart.control(minsplit = 50, cp = 0))
+
+# Visualization
+fancyRpartPlot(dt_improved)
+```
+
+Looks like our Decision Tree has improved to much better outlook. Let's perform feature engineering in order to improve our score more.
+
+## Feature Engineering
+
+Adding a new feature Family Size and understanding it's importance by plotting it.
+
+```{r dt_feature_engineering}
+# Creating a Train Sample
+train_sample <- titanic_train
+train_sample$family_size <- train_sample$SibSp + train_sample$Parch + 1
+
+# Implementataion.
+dt_feature <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked +
+                      family_size, data = train_sample, method = "class")
+
+# Visualization
+fancyRpartPlot(dt_feature)
+```
+
+As can be noted in the above DT Plot, our feature engineering play no role in deciding the suvivability rate.
+
+```{r dt_feature_engineering_1}
+#Creating Samples
+train1 <- titanic_train
+test1 <- titanic_test
+
+# Using Passenger Names
+pass_names <- train1$Name
+pass_names1 <- test1$Name
+
+# Differentiating Titles
+titles <- gsub(pattern = "^.*, (.*?)\\..*$", "\\1", pass_names)
+titles1 <- gsub(pattern = "^.*, (.*?)\\..*$", "\\1", pass_names1)
+
+# Adding Title to the Dataset
+train1$Title <- titles
+test1$Title <- titles1
+
+# New DT
+dt_feature1 <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked +
+                       Title,data = train1, method = "class")
+
+# Plotting
+fancyRpartPlot(dt_feature1)
+
+# Conversion of Dona to Mrs
+test1$Title[test1$Title == "Dona"] <- "Mrs"
+```
+
+As, you can note from the plot above, our newly featured variable is used in decision making. Now, lets make predictions using this feature.
+
+```{r dt_feature_engineering_pred}
+# Calcualtions
+library(ROCR)
+
+# Make prediction
+my_pred1 <- predict(dt_feature1, newdata = test1, type = "class")
+
+# Submission
+my_solution2 <- data.frame(PassengerId = test1$PassengerId, Survived = my_pred1)
+
+write.csv(my_solution2, file = "my_solution2.csv", row.names = FALSE)
+```
+
+Your submission scored 0.80383, which is an improvement of your previous score of 0.78469. Great job!
+
+## Combining the DataSet
+
+```{r combine}
+library(dplyr)
+
+all_data <- bind_rows(train1, test1)
+
+all_data$family_size <- all_data$SibSp + all_data$Parch + 1
+
+# Dropping Child Columns
+drops <- c("Child")
+all_data <- all_data[ , !(names(all_data) %in% drops)]
+
+# Passenger on row 62 and 830 do not have a value for embarkment.
+# Since many passengers embarked at Southampton, we give them the value S.
+all_data$Embarked[c(62, 830)] <- "S"
+
+# Factorize embarkment codes.
+all_data$Embarked <- factor(all_data$Embarked)
+
+# Passenger on row 1044 has an NA Fare value. Let's replace it with the median fare value.
+all_data$Fare[1044] <- median(all_data$Fare, na.rm = TRUE)
+
+# How to fill in missing Age values?
+# We make a prediction of a passengers Age using the other variables.
+# This time we use method = "anova" since we are predicting a continuous variable.
+predicted_age <- rpart(Age ~ Pclass + Sex + SibSp + Parch + Fare + Embarked + Title +
+                         family_size, data = all_data[!is.na(all_data$Age),], 
+                       method = "anova")
+
+all_data$Age[is.na(all_data$Age)] <- predict(predicted_age, all_data[is.na(all_data$Age),])
+
+# Split the data back into a train set and a test set
+train2 <- all_data[1:891,]
+test2 <- all_data[892:1309,]
+
+# Factor Conversion
+cols <- c("Sex", "Ticket", "Cabin", "Title")
+train2[cols] <- lapply(train2[cols], factor)
+test2[cols] <- lapply(test2[cols], factor)
+
+# Level out the Factors, cause they might give you errors when doind predictions.
+# The Training and The Test data should have same factor levels.
+levels(test2$Ticket) <- levels(train2$Ticket)
+levels(test2$Title) <- levels(train2$Title)
+levels(test2$Cabin) <- levels(train2$Cabin)
+
+str(train2)
+str(test2)
+```
+
+
+## Random Forest Algorithm
+For RF Algorithm, we make use of the randomforest library package available.
+
+* First we provide the formula. There is no argument class here to inform the function you're dealing with predicting a categorical variable, so you need to turn Survived into a factor with two levels: as.factor(Survived) ~ Pclass + Sex + Age
+
+* When we put the importance argument to TRUE we can inspect variable importance.
+
+* The ntree argument specifies the number of trees to grow. Limit these when having only  limited computational power at your disposal.
+
+* Since Random Forest uses randomization, we set a seed like this set.seed(111) to assure reproducibility of our results. Once the model is constructed, we can use the prediction function predict().
+
+```{r rf_algorithms}
+library(randomForest)
+
+# Set seed for reproducibility
+set.seed(111)
+
+# Apply the Random Forest Algorithm
+rf <- randomForest(as.factor(Survived) ~ Pclass + Sex + Age + SibSp + Parch + Fare +
+                          Embarked + Title, data = train2, importance = TRUE, 
+                          ntree = 1000)
+
+# Prediction
+my_pred2 <- predict(rf, test2)
+
+# Kaggle Solution
+my_solution3 <- data.frame(PassengerId = test2$PassengerId, Survived = my_pred2)
+
+# Write your solution away to a csv file with the name my_solution.csv
+write.csv(my_solution3, file = "my_solution3.csv", row.names = FALSE)
+
+# Plotting IMP Varaibles
+varImpPlot(rf)
+```
+
+Your submission scored 0.74641, which is not an improvement of your best score. Keep trying!
