@@ -1,0 +1,260 @@
+---
+title: "Data Cleaning"
+author: "Javeed Basha"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data and Library Loading
+
+```{r data_library_load}
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(stringr)
+weather <- read.csv("weather.csv", stringsAsFactors = FALSE)
+bmi <- read.csv("body_mass.csv", stringsAsFactors = FALSE)
+bmi_cc <- read.csv("bmi_mass_cc.csv", stringsAsFactors = FALSE)
+census <- read.csv("census_data.csv", stringsAsFactors = FALSE)
+students <- read.csv("students_data.csv", stringsAsFactors = FALSE)
+students2 <- read.csv("students_data_year.csv", stringsAsFactors = FALSE)
+social_df <- read.csv("social.csv", stringsAsFactors = FALSE)
+```
+
+
+## Topics Covered:
+1. Exploring Raw Data
+2. Tidying Data
+3. Analysing Data
+
+## Investigating Raw Data
+
+```{r dc_one}
+# Data Views
+head(weather)
+tail(weather)
+str(weather)
+
+# Understanding the Data
+class(bmi)
+dim(bmi)
+names(bmi) # Printing Cloumn Names
+str(bmi)
+
+glimpse(bmi)
+summary(bmi)
+
+# Printing
+head(bmi, 10)
+tail(bmi, 10)
+
+# Plotting
+hist(bmi$Y2008)
+# Comparision Plot
+plot(bmi$Y1980, bmi$Y2008)
+```
+
+## Tidying Data
+
+Rows are referred as Observations.
+Columns are referred as Variables.
+One type of Observational Unit per table.
+
+# Principles of Messy Data
+1. Cloumn headers are values, not variable names.
+2. Multiple variable are stored in a single column.
+3. A single observational unit is stored in multiple tables.
+4. Multiple types of observational unit are stored in the same table.
+
+```{r data_two}
+# Applying gather() - tidyr package to year columns
+bmi_long <- gather(bmi, year, bmi_val, -Country)
+# Checking dimensions
+dim(bmi_long)
+
+# Reversal spread()
+bmi_wide <- spread(bmi, year, bmi_val)
+head(bmi_wide)
+
+# Separate Function
+bmi_cc_clean <- separate(bmi_cc, col = Country_ISO, into = c("Country", "ISO"), sep = "/")
+head(bmi_cc_clean)
+
+# Unite Function
+bmi_cc <- unite(bmi_cc_clean, Country_ISO, Country, ISO, sep = "-")
+head(bmi_cc)
+
+## Example - Column headers are values, not variable names
+head(census, 10)
+# Gather the month columns
+census2 <- gather(census, month, amount, - YEAR)
+# Arrange rows by YEAR using dplyr's arrange
+census2 <- arrange(census2, YEAR)
+# View first 20 rows of census2
+head(census2, 20)
+
+## Example - Variables are stored in both rows and columns
+# Spread the type column
+census_long2 <- spread(census_long, type, amount)
+head(census_long2, 20)
+
+## Example - Multiple values are stored in one column
+census_long4 <- separate(census_long3, col = yr_month, 
+                         into = c("year", "month"), sep = "_")
+head(census_long4, 6)
+```
+
+## Analysing Data
+
+```{r data_three}
+## Analysing Students DataSet
+str(students)
+students$Grades <- as.character(students$Grades)
+students$Medu <- as.factor(students$Medu)
+students$Fedu <- as.factor(students$Fedu)
+str(students)
+
+# Lubridate Package Examples
+str(students2)
+# Parse as date
+dmy("17 Sep 2015")
+# Parse as date and time (with no seconds!)
+mdy_hm("July 15, 2012 12:56")
+# Coerce dob to a date (with no time)
+students2$dob <- ymd(students2$dob)
+# Coerce nurse_visit to a date and time
+students2$nurse_visit <- ymd_hms(students2$nurse_visit)
+str(students2)
+
+## Working with Stringr Package
+# Trim all leading and trailing whitespace
+str_trim(c("   Filip ", "Nick  ", " Jonathan"))
+# Pad these strings with leading zeros
+str_pad(c("23485W", "8823453Q", "994Z"), width = 9, side = "left", pad = "0")
+
+# Detect all dates of birth (dob) in 1997
+str_detect(students2$dob, "1997")
+# In the sex column, replace "F" with "Female"...
+students2$sex <- str_replace(students2$sex, "F", "Female")
+# ...And "M" with "Male"
+students2$sex <- str_replace(students2$sex, "M", "Male")
+# View the head of students2
+head(students2)
+
+## Missing Values
+is.na(social_df)
+any(is.na(social_df))
+summary(social_df)
+
+table(social_df$status)
+
+# Example
+social_df$status[social_df$status == ""] <- NA
+complete.cases(social_df)
+na.omit(social_df)
+
+## Outliers & Errors
+summary(students)
+
+# View a histogram of the age variable
+hist(students$age)
+# View a histogram of the absences variable
+hist(students$absences)
+# View a histogram of absences, but force zeros to be bucketed to the right of zero
+hist(students3$absences, right = FALSE)
+
+# View a boxplot of age
+boxplot(students3$age)
+# View a boxplot of absences
+boxplot(students3$absences)
+```
+
+## UseCase - Examples
+
+```{r data_use_case}
+# Exploration
+class(weather)
+
+dim(weather)
+
+names(weather)
+
+str(weather)
+
+glimpse(weather)
+
+summary(weather)
+
+head(weather)
+
+tail(weather)
+
+# Tidying Data - Tidyr
+weather2 <- gather(weather, day, value, X1:X31, na.rm = TRUE)
+# Removing column of row names
+weather2 <- weather2[, -1]
+
+# Spread the data
+weather3 <- spread(weather2, measure, value)
+head(weather3)
+
+## Preparation - Lubridate & Stringr
+# Remove X's from day column
+weather3$day <- str_replace(weather3$day, "X", "")
+# Unite the year, month, and day columns
+weather4 <- unite(weather3, date, year, month, day, sep = "-")
+# Convert date column to proper date format using lubridates's ymd()
+weather4$date <- ymd(weather4$date)
+# Rearrange columns using dplyr's select()
+weather5 <- select(weather4, date, Events, CloudCover:WindDirDegrees)
+# View the head of weather5
+head(weather5)
+
+
+# Replace T with 0 (T = trace)
+weather5$PrecipitationIn <- str_replace(weather5$PrecipitationIn, "T", 0)
+# Convert characters to numerics
+weather6 <- mutate_each(weather5, funs(as.numeric), CloudCover:WindDirDegrees)
+str(weather6)
+
+## Missing, Extreme, Outliers Data
+# Count missing values
+sum(is.na(weather6))
+# Find missing values
+summary(weather6)
+# Find indices of NAs in Max.Gust.SpeedMPH
+ind <- which(is.na(weather6$Max.Gust.SpeedMPH))
+# Look at the full rows for records missing Max.Gust.SpeedMPH
+weather6[ind, ]
+
+# Review distributions for all variables
+summary(weather6)
+# Find row with Max.Humidity of 1000
+ind <- which(weather6$Max.Humidity == 1000)
+# Look at the data for that day
+weather6[ind, ]
+# Change 1000 to 100
+weather6$Max.Humidity[ind] <- 100
+
+# Look at summary of Mean.VisibilityMiles
+summary(weather6$Mean.VisibilityMiles)
+# Get index of row with -1 value
+ind <- which(weather6$Mean.VisibilityMiles == -1)
+# Look at full row
+weather6[ind, ]
+# Set Mean.VisibilityMiles to the appropriate value
+weather6$Mean.VisibilityMiles[ind] <- 10
+
+# Review summary of full data once more
+summary(weather6)
+# Look at histogram for MeanDew.PointF
+hist(weather6$MeanDew.PointF)
+# Look at histogram for Min.TemperatureF
+hist(weather6$Min.TemperatureF)
+# Compare to histogram for Mean.TemperatureF
+hist(weather6$Mean.TemperatureF)
+```
+
